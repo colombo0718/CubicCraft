@@ -556,12 +556,21 @@
         ]
       }
 
+      // action 0=none 1=up 2=down 3=left 4=right
+      var RR_ACTIONS = [
+        {up:false, down:false, left:false, right:false},
+        {up:true,  down:false, left:false, right:false},
+        {up:false, down:true,  left:false, right:false},
+        {up:false, down:false, left:true,  right:false},
+        {up:false, down:false, left:false, right:true },
+      ]
+
       game.rr.step = function(action){
-        // decode 4-bit: bit0=up bit1=down bit2=left bit3=right
-        craft.jet('up',    !!(action & 1))
-        craft.jet('down',  !!(action & 2))
-        craft.jet('left',  !!(action & 4))
-        craft.jet('right', !!(action & 8))
+        var a = RR_ACTIONS[action] || RR_ACTIONS[0]
+        craft.jet('up',    a.up)
+        craft.jet('down',  a.down)
+        craft.jet('left',  a.left)
+        craft.jet('right', a.right)
         var reward = -0.01, done = false
         for(var i=0; i<game.rr.stepsPerAction; i++){
           game.rr.stepCount++
@@ -579,13 +588,6 @@
           game.rr.active = true
           game.rr.sessionId = msg.sessionId
           game.rr.reset()
-          var aNames = []
-          for(var i=0;i<16;i++){
-            var p=[]
-            if(i&1) p.push('↑'); if(i&2) p.push('↓')
-            if(i&4) p.push('←'); if(i&8) p.push('→')
-            aNames.push(p.length ? p.join('') : '○')
-          }
           window.parent.postMessage({
             type:'gameInfo',
             players:[{ stateInfo:[
@@ -598,7 +600,7 @@
               {name:'dx_cp', min:-300, max:300, bin:20},
               {name:'dy_cp', min:-300, max:300, bin:20},
               {name:'dist',  min:0,    max:500, bin:20}
-            ], actionInfo:[{ type:'switch', level:16, name:aNames }] }]
+            ], actionInfo:[{ type:'switch', level:5, name:['○','↑','↓','←','→'] }] }]
           }, '*')
         }
         if(msg.type === 'action' && !game.rr.paused){
