@@ -17,38 +17,25 @@
       
       #log{
         position: absolute;
-        width:40%;
-        height:20%;
-        top: 78%;
-        left: 5px;
-        padding: .2em;
-        outline: 0;
+        width: 200px;
+        bottom: 12px;
+        right: 12px;
+        padding: .4em .6em;
         font-family: monospace;
-        font-size: 1em;
-        color:#0ff;
-        background-color: #011;
+        font-size: .85em;
+        line-height: 1.6;
+        color: #0ff;
+        background-color: rgba(0,17,17,0.75);
         border: 1px solid #0ff;
-        overflow-y: hidden;
-        /*vertical-align: bottom;*/
-      }
-
-      #log-text{
-        vertical-align: bottom;
-      }
-
-      #log-text{
-        margin-top:5px;
-        
+        border-radius: 4px;
       }
     </style>
   </head>
   <body>
     <div id="container" oncontextmenu="return false;"></div>
 
-    <div id="log">[ System Log ]
-      <div id=log-cont>
-        <p id="log-text"></p>
-      </div>  
+    <div id="log">
+      <div id="log-text"></div>
     </div>
 
     <script> 
@@ -105,32 +92,6 @@
         craft.offsetX(craft.massCent.x)
         craft.offsetY(craft.massCent.y)
 
-        var cyanCircle = new Konva.Circle({
-          x:craft.massCent.x,
-          y:craft.massCent.y,
-          radius: r*2,
-          stroke: '#0ff',
-          strokeWidth: .2,
-        });
-        craft.add(cyanCircle)
-
-        var cyanArrow = new Konva.Line({
-          x:craft.massCent.x,
-          y:craft.massCent.y,
-          points: [r,r*3, 0,r*6,-r,r*3, r,r*3],
-          stroke: '#0ff',
-          strokeWidth: .2
-        });
-        craft.add(cyanArrow)
-
-        var cyanBox = new Konva.Line({
-          x:craft.massCent.x,
-          y:craft.massCent.y,
-          points: [r*3,r*2, r*3,0, -r*3,0, -r*3,r*2],
-          stroke: '#0ff',
-          strokeWidth: .2
-        });
-        craft.add(cyanBox)
 
         for(var i=0;i<model.unite.length;i++){
           var p=new Victor(model.unite[i].x,model.unite[i].y);
@@ -497,7 +458,7 @@
           y: height/2,
           width: width,
           height: height,
-          scale:{x:3,y:-3}
+          scale:{x:6,y:-6}
         });
 
         field = new Konva.Layer({scale:{x:1,y: 1}});
@@ -620,7 +581,14 @@
             runway.checkpoint[pg].visible(false)
             game.progress+=1
           }
-          UI.print("time = "+game.time+"<br>"+craft.position+"<br>"+craft.velocity)
+          var spd=craft.velocity.length()
+          UI.print(
+            "t&nbsp;&nbsp; "+game.time.toFixed(2)+" s<br>"+
+            "pos ("+craft.x().toFixed(1)+", "+craft.y().toFixed(1)+")<br>"+
+            "vel ("+craft.velocity.x.toFixed(1)+", "+craft.velocity.y.toFixed(1)+")  "+spd.toFixed(1)+"<br>"+
+            "fac "+craft.fac.toFixed(0)+"°&nbsp;&nbsp; ω "+craft.rotaVelo.toFixed(1)+"<br>"+
+            "cp&nbsp; "+game.progress+" / "+runway.checkpoint.length
+          )
           }
 
       }
