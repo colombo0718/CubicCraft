@@ -623,12 +623,30 @@
           UI.print("time = "+game.time+"<br>"+craft.position+"<br>"+craft.velocity)
           }
 
-        space.batchDraw()         
       }
 
       game.init()
       game.setup();
-      (function loop(){game.flash();requestAnimationFrame(loop);})()
+      (function(){
+        var fixedDt = 0.0100;
+        var accumulator = 0;
+        var lastTs = null;
+        var maxStep = 0.05; // cap: skip physics if tab was hidden >50ms
+        function loop(ts){
+          if(lastTs !== null){
+            var elapsed = (ts - lastTs) / 1000;
+            accumulator += Math.min(elapsed, maxStep);
+            while(accumulator >= fixedDt){
+              game.flash();
+              accumulator -= fixedDt;
+            }
+          }
+          lastTs = ts;
+          space.batchDraw();
+          requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+      })()
     </script>
   </body>
 </html>
