@@ -523,7 +523,7 @@
       })
 
       // ── Web Worker: Rapier.js physics in separate thread ──────────────
-      var physicsWorker = new Worker('./physics.worker.js')
+      var physicsWorker = new Worker('./physics.worker.js', {type:'module'})
 
       physicsWorker.onmessage = function(event){
         var msg = event.data
