@@ -169,15 +169,15 @@
           
         }
         // calculate one step move of craft in dt 
+        craft._engines = craft.find("#fire");
+
         craft.run=function(dt){
           craft.forceSum=new Victor()
           craft.torquSum=0
-          // console.log(craft.find("#fire").length)
-          for(var i=0;i<craft.find("#fire").length;i++){
-            if(craft.find("#fire")[i].visible()){
-              craft.forceSum.add(craft.find("#fire")[i].force)
-              craft.torquSum+=craft.find("#fire")[i].torqu
-              // console.log(craft.torquSum)
+          for(var i=0;i<craft._engines.length;i++){
+            if(craft._engines[i].visible()){
+              craft.forceSum.add(craft._engines[i].force)
+              craft.torquSum+=craft._engines[i].torqu
             }
           }
           // console.log(craft.forceSum,craft.torquSum)
@@ -378,26 +378,33 @@
 
         // runway.guideLine=new Konva.Group({name:"guideline"})
         
-        runway.plotGuideLine=function(craft,p){
-          runway.find('.guideline').destroy()
-          runway.guideLine=new Konva.Group({name:"guideline"})
-          var line=new Konva.Line({
-            points:[craft.x(),craft.y(),runway.checkpoint[p].x(),runway.checkpoint[p].y()],
-            stroke: '#ff0',
-            strokeWidth: .2,
-          })
-          runway.guideLine.add(line)
+        // Build guide line once; update only the first segment each frame
+        runway._guideLeadLine = new Konva.Line({stroke:'#ff0', strokeWidth:.2, points:[0,0,0,0]})
+        runway._guideStaticLines = []
+        runway._guideCp = -1
+        runway.guideLine = new Konva.Group({name:"guideline"})
+        runway.guideLine.add(runway._guideLeadLine)
+        runway.add(runway.guideLine)
 
-          for(var i=p;i<runway.checkpoint.length-1;i++){
-            var line=new Konva.Line({
-              points:[runway.checkpoint[i].x(),runway.checkpoint[i].y(),
-                      runway.checkpoint[i+1].x(),runway.checkpoint[i+1].y()],
-              stroke: '#ff0',
-              strokeWidth: .2,
-            })
-            runway.guideLine.add(line)
+        runway.plotGuideLine=function(craft,p){
+          // Rebuild static segment lines only when checkpoint index changes
+          if(p !== runway._guideCp){
+            runway._guideCp = p
+            runway._guideStaticLines.forEach(function(l){l.destroy()})
+            runway._guideStaticLines = []
+            for(var i=p;i<runway.checkpoint.length-1;i++){
+              var sl=new Konva.Line({
+                points:[runway.checkpoint[i].x(),runway.checkpoint[i].y(),
+                        runway.checkpoint[i+1].x(),runway.checkpoint[i+1].y()],
+                stroke:'#ff0', strokeWidth:.2,
+              })
+              runway._guideStaticLines.push(sl)
+              runway.guideLine.add(sl)
+            }
           }
-          runway.add(runway.guideLine)
+          // Update only the moving segment (craft → next checkpoint)
+          runway._guideLeadLine.points([craft.x(),craft.y(),
+            runway.checkpoint[p].x(),runway.checkpoint[p].y()])
         }
 
         runway.orbitLine=new Konva.Group()
@@ -620,8 +627,8 @@
       }
 
       game.init()
-      game.setup()
-      setInterval("game.flash()",10)
+      game.setup();
+      (function loop(){game.flash();requestAnimationFrame(loop);})()
     </script>
   </body>
 </html>
