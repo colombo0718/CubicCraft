@@ -1,117 +1,60 @@
-// physics.worker.js — Rapier2D in a module Web Worker
-// Load via: new Worker('./physics.worker.js', {type:'module'})
-import RAPIER from 'https://cdn.skypack.dev/@dimforge/rapier2d-compat';
+// physics.worker.js — hand-rolled physics, no external deps
+var FIXED_DT = 0.010;
+var body = null, engineDefs = [], active = {up:false,down:false,left:false,right:false};
+var stepTime = 0, generation = 0;
 
-await RAPIER.init();
-
-const FIXED_DT = 0.010;
-
-let world      = null;
-let craftBody  = null;
-let engineDefs = [];
-let active     = { up:false, down:false, left:false, right:false };
-let stepTime   = 0;
-let generation = 0;
-
-function buildWorld(craftData) {
-  if (world) { world.free(); world = null; }
-
-  world = new RAPIER.World({ x:0, y:0 });
-  world.timestep = FIXED_DT;
-
-  const n = craftData.unite.length;
-  let comX = 0, comY = 0;
-  for (let i = 0; i < n; i++) { comX += craftData.unite[i].x; comY += craftData.unite[i].y; }
-  comX /= n;  comY /= n;
-
-  craftBody = world.createRigidBody(
-    RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 0)
-  );
-
-  for (let i = 0; i < n; i++) {
-    world.createCollider(
-      RAPIER.ColliderDesc
-        .cuboid(0.5, 0.5)
-        .setTranslation(craftData.unite[i].x - comX, craftData.unite[i].y - comY)
-        .setDensity(1.0)
-        .setFriction(0)
-        .setRestitution(0),
-      craftBody
-    );
+function initBody(craftData) {
+  var n = craftData.unite.length, comX = 0, comY = 0;
+  for (var i = 0; i < n; i++) { comX += craftData.unite[i].x; comY += craftData.unite[i].y; }
+  comX /= n; comY /= n;
+  var inertia = 0;
+  for (var i = 0; i < n; i++) {
+    var dx = craftData.unite[i].x - comX, dy = craftData.unite[i].y - comY;
+    inertia += dx*dx + dy*dy;
   }
-
-  engineDefs = craftData.engines.map(e => {
-    const angle = 0.5 * Math.PI * e.dir;
-    return {
-      name: e.name,
-      fx: -200 * e.len * Math.cos(angle),
-      fy: -200 * e.len * Math.sin(angle),
-      px: e.x - comX,
-      py: e.y - comY
-    };
+  body = { mass:n, inertia:inertia, px:0, py:0, vx:0, vy:0, rotation:0, angVel:0 };
+  engineDefs = craftData.engines.map(function(e) {
+    var angle = 0.5 * Math.PI * e.dir;
+    var fx = -200*e.len*Math.cos(angle), fy = -200*e.len*Math.sin(angle);
+    var epx = e.x-comX, epy = e.y-comY;
+    return { name:e.name, fx:fx, fy:fy, torque:epx*fy - epy*fx };
   });
-
-  stepTime = 0;
-  active   = { up:false, down:false, left:false, right:false };
+  stepTime = 0; active = {up:false,down:false,left:false,right:false};
 }
 
 function doStep() {
-  if (!craftBody) return;
-
-  const rot = craftBody.rotation();
-  const cos = Math.cos(rot), sin = Math.sin(rot);
-  const pos = craftBody.translation();
-
-  for (const e of engineDefs) {
-    if (!active[e.name]) continue;
-    const wfx = e.fx * cos - e.fy * sin;
-    const wfy = e.fx * sin + e.fy * cos;
-    const wpx = e.px * cos - e.py * sin + pos.x;
-    const wpy = e.px * sin + e.py * cos + pos.y;
-    craftBody.addForceAtPoint({ x:wfx, y:wfy }, { x:wpx, y:wpy }, true);
+  if (!body) return;
+  var fxSum=0, fySum=0, tqSum=0;
+  for (var i=0; i<engineDefs.length; i++) {
+    var e=engineDefs[i]; if (!active[e.name]) continue;
+    fxSum+=e.fx; fySum+=e.fy; tqSum+=e.torque;
   }
-
-  world.step();
-  stepTime += FIXED_DT;
-
-  const p = craftBody.translation();
-  const v = craftBody.linvel();
-  const r = craftBody.rotation();
-  const w = craftBody.angvel();
-  const rotDeg = r * 180 / Math.PI;
-
-  postMessage({
-    type:     'state',
-    x:        p.x,  y:        p.y,
-    vx:       v.x,  vy:       v.y,
-    rotation: rotDeg,
-    fac:      rotDeg + 90,
-    spd:      Math.sqrt(v.x*v.x + v.y*v.y),
-    vag:      Math.atan2(v.y, v.x) * 180 / Math.PI,
-    rotaVelo: w * 180 / Math.PI,
-    time:     stepTime,
-    gen:      generation
-  });
+  var rotRad = body.rotation * Math.PI/180;
+  var cos=Math.cos(rotRad), sin=Math.sin(rotRad);
+  body.vx       += (fxSum*cos - fySum*sin) / body.mass    * FIXED_DT;
+  body.vy       += (fxSum*sin + fySum*cos) / body.mass    * FIXED_DT;
+  body.angVel   += tqSum / body.inertia                   * FIXED_DT;
+  body.px       += body.vx      * FIXED_DT;
+  body.py       += body.vy      * FIXED_DT;
+  body.rotation += body.angVel  * FIXED_DT;
+  stepTime      += FIXED_DT;
+  var spd = Math.sqrt(body.vx*body.vx + body.vy*body.vy);
+  postMessage({ type:'state', x:body.px, y:body.py, vx:body.vx, vy:body.vy,
+    rotation:body.rotation, fac:body.rotation+90, spd:spd,
+    vag:Math.atan2(body.vy,body.vx)*180/Math.PI, rotaVelo:body.angVel,
+    time:stepTime, gen:generation });
 }
 
 setInterval(doStep, FIXED_DT * 1000);
 
 self.onmessage = function(event) {
-  const msg = event.data;
-  if (msg.type === 'init') {
-    buildWorld(msg.craftData);
-  } else if (msg.type === 'setEngines') {
-    active = msg.engines;
-  } else if (msg.type === 'reset') {
+  var msg = event.data;
+  if (msg.type==='init') { initBody(msg.craftData); }
+  else if (msg.type==='setEngines') { active = msg.engines; }
+  else if (msg.type==='reset') {
     generation++;
-    if (craftBody) {
-      craftBody.setTranslation({ x:0, y:0 }, true);
-      craftBody.setLinvel(    { x:0, y:0 }, true);
-      craftBody.setRotation(0, true);
-      craftBody.setAngvel(  0, true);
-    }
-    active   = { up:false, down:false, left:false, right:false };
-    stepTime = 0;
-    postMessage({ type:'resetAck', gen:generation });
+    if (body) { body.px=body.py=body.vx=body.vy=body.rotation=body.angVel=0; }
+    active={up:false,down:false,left:false,right:false}; stepTime=0;
+    postMessage({type:'resetAck', gen:generation});
   }
 };
