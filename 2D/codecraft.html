@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://unpkg.com/konva@3.4.1/konva.min.js"></script>
+    <script src="./victor.js"></script>
+    <meta charset="utf-8" />
+    <title>COC2D</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #000000;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+    <script>
+
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+
+      var space = new Konva.Stage({
+        container: 'container',
+        x: width/2,
+        y: height/2,
+        width: width,
+        height: height,
+        scale:{x:3,y:-3}
+      });
+
+      // console.log(space.scale({x:10,y:10}))  
+      var kernal={
+        type:"model",
+        unite:[
+          {x: 1,y: 1,color:"#0ff"},
+          {x: 0,y: 1,color:"#ff0"},
+          {x:-1,y: 1,color:"#0ff"},
+          {x: 1,y: 0,color:"#ff0"},
+          {x: 0,y: 0,color:"#0ff"},
+          {x:-1,y: 0,color:"#ff0"},
+          {x: 1,y:-1,color:"#ff0"},
+          {x: 0,y:-1,color:"#0ff"},
+          {x:-1,y:-1,color:"#ff0"},
+
+          {x: 2,y: 0,color:"#f0f"},
+          {x:-3,y: 0,color:"#f0f"},
+          {x:-2,y: 0,color:"#f0f"},
+          {x: 3,y: 0,color:"#f0f"},
+          {x: 0,y: 2,color:"#f0f"},
+          {x: 0,y: 3,color:"#f0f"},
+          {x: 0,y:-2,color:"#f0f"},
+          {x: 0,y:-3,color:"#f0f"},
+
+          // {x: 100,y:30,color:"#f0f"},
+        ],
+        engines:[
+          {name:"up" ,len:2,dir:3,x: 0,y:-4},
+          {name:"down" ,len:2,dir:1,x: 0,y: 4},
+          {name:"left" ,len:2,dir:0,x: 4,y: 0},
+          {name:"right",len:2,dir:2,x:-4,y: 0},
+        ]
+      }
+      var double={
+        type:"model",
+        unite:[
+          {x: 1,y: 1,color:"#0ff"},
+          {x: 0,y: 1,color:"#ff0"},
+          {x:-1,y: 1,color:"#0ff"},
+          {x: 1,y: 0,color:"#ff0"},
+          {x: 0,y: 0,color:"#0ff"},
+          {x:-1,y: 0,color:"#ff0"},
+          {x: 1,y:-1,color:"#ff0"},
+          {x: 0,y:-1,color:"#0ff"},
+          {x:-1,y:-1,color:"#ff0"},
+
+          {x: 2,y: 0,color:"#ffffff"},
+          {x: 3,y: 0,color:"#ffffff"},
+          {x: 4,y: 0,color:"#ffffff"},
+          {x:-2,y: 0,color:"#ffffff"},
+          {x:-3,y: 0,color:"#ffffff"},
+          {x:-4,y: 0,color:"#ffffff"},
+
+          {x: 4,y: 1,color:"#f0f"},
+          {x: 4,y: 2,color:"#f0f"},
+          {x: 4,y:-1,color:"#f0f"},
+          {x: 4,y:-2,color:"#f0f"},
+          {x:-4,y: 1,color:"#f0f"},
+          {x:-4,y: 2,color:"#f0f"},
+          {x:-4,y:-1,color:"#f0f"},
+          {x:-4,y:-2,color:"#f0f"},
+        ],
+        engines:[
+          {name:"bRight"   ,len:2,dir:1,x: 4,y: 3},
+          {name:"fRight" ,len:2,dir:3,x: 4,y:-3},
+          {name:"bLeft" ,len:2,dir:1,x:-4,y: 3},
+          {name:"fLeft",len:2,dir:3,x:-4,y:-3},
+        ]
+      }
+
+      var fighter={
+        type:"model",
+        unite:[
+          {x: 1,y: 1,color:"#0ff"},
+          {x: 0,y: 1,color:"#ff0"},
+          {x:-1,y: 1,color:"#0ff"},
+          {x: 1,y: 0,color:"#ff0"},
+          {x: 0,y: 0,color:"#0ff"},
+          {x:-1,y: 0,color:"#ff0"},
+          {x: 1,y:-1,color:"#ff0"},
+          {x: 0,y:-1,color:"#0ff"},
+          {x:-1,y:-1,color:"#ff0"},
+
+          {x: 0,y: 2,color:"#ffffff"},
+          {x: 0,y: 3,color:"#ffffff"},
+          {x: 2,y:-2,color:"#ffffff"},
+          {x: 2,y:-1,color:"#ffffff"},
+          {x: 3,y:-2,color:"#ffffff"},
+          {x:-2,y:-2,color:"#ffffff"},
+          {x:-2,y:-1,color:"#ffffff"},
+          {x:-3,y:-2,color:"#ffffff"},
+          
+          
+          // Major
+          {x: 0,y:-2,color:"#f0f"},
+          {x: 0,y:-3,color:"#f0f"},
+          {x: 0,y:-4,color:"#f0f"},
+          // mr
+          {x: 1,y:-2,color:"#f0f"},
+          {x: 1,y:-3,color:"#f0f"},
+          // ml
+          {x:-1,y:-2,color:"#f0f"},
+          {x:-1,y:-3,color:"#f0f"},
+          // br
+          {x: 2,y:-2,color:"#f0f"},
+          {x: 2,y:-1,color:"#f0f"},
+          // bl
+          {x:-2,y:-2,color:"#f0f"},
+          {x:-2,y:-1,color:"#f0f"},
+          // Right
+          {x: 4,y:-1,color:"#f0f"},
+          {x: 4,y:-2,color:"#f0f"},
+          {x: 4,y:-3,color:"#f0f"},
+          // Left
+          {x:-4,y:-1,color:"#f0f"},
+          {x:-4,y:-2,color:"#f0f"},
+          {x:-4,y:-3,color:"#f0f"},
+        ],
+        engines:[
+          {name:"Major"   ,len:3,dir:3,x: 0,y:-5},
+          {name:"mr" ,len:2,dir:3,x: 1,y:-4},
+          {name:"ml" ,len:2,dir:3,x:-1,y:-4},
+          {name:"Left" ,len:3,dir:3,x: 4,y:-4},
+          {name:"Right",len:3,dir:3,x:-4,y:-4},
+          {name:"br" ,len:2,dir:1,x: 2,y: 0},
+          {name:"bl" ,len:2,dir:1,x:-2,y: 0},
+        ]
+      }
+
+
+      var buildCraft=function(model){
+
+        var craft = new Konva.Group();
+        craft.radius=0
+        craft.mass=model.unite.length        
+        craft.massCent=new Victor()
+
+        craft.forceSum=new Victor()  
+        craft.accelera=new Victor()
+        craft.velocity=new Victor()
+        craft.displace=new Victor()
+
+        craft.inertia=0
+        craft.torquSum=0
+        craft.rotaAcce=0
+        craft.rotaVelo=0
+
+        craft.left=new Victor(1,0)
+        craft.head=new Victor(0,1)
+
+        for(var i=0;i<model.unite.length;i++){
+          var rect = new Konva.Rect({
+            x: model.unite[i].x,
+            y: model.unite[i].y,
+            offsetX: 0.5,
+            offsetY: 0.5,
+            width: 1,
+            height: 1,
+            fill: model.unite[i].color,
+            stroke: '#000000',
+            strokeWidth: .05
+          });
+          craft.add(rect);
+        }
+        // calculate COM and Inertia --------------------
+        for(var i=0;i<model.unite.length;i++){
+          var p=new Victor(model.unite[i].x,model.unite[i].y);
+          craft.radius+=p.length()
+         
+          // craft.massCent.x += model.unite[i].x
+          // craft.massCent.y += model.unite[i].y
+          craft.massCent.add( model.unite[i])
+        }  
+        craft.radius/=craft.mass
+        craft.massCent.divideScalar(craft.mass)
+        // console.log(craft.radius+"\n"+craft.massCent.toString())
+        craft.offsetX(craft.massCent.x)
+        craft.offsetY(craft.massCent.y)
+
+        for(var i=0;i<model.unite.length;i++){
+          var p=new Victor(model.unite[i].x,model.unite[i].y);
+          craft.inertia+=p.distanceSq(craft.massCent)
+          // console.log(craft.inertia)
+        }
+        console.log(craft.mass+"\n"+craft.radius+"\n"+craft.massCent.toString()+"\n"+craft.inertia)
+        // ------------------------------------------------
+        for(var i=0;i<model.engines.length;i++){
+          var len = model.engines[i].len
+          var fire = new Konva.Line({
+            id:"fire",
+            name:model.engines[i].name,
+            x: model.engines[i].x,
+            y: model.engines[i].y,
+            points: [0, 0, len/2, .4, 1.5*len,0,len/2,-.4],
+            fill: '#f00',
+            stroke: 'black',
+            strokeWidth: 0,
+            rotation:90*model.engines[i].dir,
+            closed: true
+          });
+          fire.force=new Victor(-100*model.engines[i].len,0)
+          fire.force.rotate(0.5*Math.PI*model.engines[i].dir)
+          var p = new Victor(model.engines[i].x,model.engines[i].y)
+          fire.torqu=p.cross(fire.force)
+          console.log(fire.torqu)
+
+          craft.add(fire);
+        }
+        // 
+        craft.jet=function(name,onoff){
+          console.log(craft.find("."+name).length)
+          craft.find("."+name)[0].visible(onoff)
+        }
+
+        return craft;
+      }
+      var craft=buildCraft(fighter)
+      // console.log(craft.find(".right")[0].torqu)
+
+
+      var field = new Konva.Layer();
+
+
+      var buildPlane=function(){
+
+        var plane = new Konva.Group();
+
+        for(j=-100;j<=500;j+=10){
+          if(j%100==0){color="#080"}
+          else{color="#040"}  
+
+          var line = new Konva.Line({
+            points: [100,j,-100,j],
+            stroke: color,
+            strokeWidth: .1,
+
+          });
+          plane.add(line)
+        }
+
+        for(i=-100;i<=100;i+=10){
+          if(i%100==0){color="#080"}
+          else{color="#040"} 
+
+          var line = new Konva.Line({
+            points: [i,-100,i,500],
+            stroke: color,
+            strokeWidth: .1,
+
+          });
+          plane.add(line)
+        } 
+
+        return plane;
+      }
+
+      var plane=buildPlane()
+      field.add(plane)
+
+
+      // craft.find(".down")[0].visible(false)
+      // craft.find(".left")[0].visible(false)
+      // craft.find(".right")[0].visible(false)
+      // craft.jet('up',false)
+      // craft.jet('down',false)
+      // craft.jet("left",false)
+      // craft.jet("right",false)
+      // craft.jet('bRight',false)
+      // craft.jet('bLeft',false)
+      // craft.jet("fRight",false)
+      // craft.jet("fLeft",false)
+      // craft.jet("mr",false)
+      // craft.jet("ml",false)
+      // craft.jet("Left",false)
+      // craft.jet("Right",false)
+      // craft.jet("Major",false)
+
+
+      // console.log(craft.y(3))
+      // craft.x(55)
+      // craft.y(55)
+      // field.offsetX(55)
+      // field.offsetY(55)
+      
+      var cp = new Konva.Line({
+        x:0,
+        y:30,
+        points: [3,0,0,3,-3,0,0,-3,3,0,-3,0,0,3,0,-3],
+        stroke: '#ff0',
+        strokeWidth: .5,
+      });
+      field.add(cp)
+      // console.log(cp.rotation(20))
+      // craft.offsetY(3)
+
+      
+      field.add(plane)
+      field.add(craft)
+      space.add(field);
+
+
+
+      var tt=0 // total time
+      var flash=function(){
+        var dt=0.01,
+            dv=new Victor(),dx=new Victor(),
+            dw=0,dr=0
+        tt+=dt
+        craft.forceSum=new Victor()
+        craft.torquSum=0
+        // console.log(craft.find("#fire").length)
+        for(var i=0;i<craft.find("#fire").length;i++){
+          if(craft.find("#fire")[i].visible()){
+            craft.forceSum.add(craft.find("#fire")[i].force)
+            craft.torquSum+=craft.find("#fire")[i].torqu
+            // console.log(craft.torquSum)
+          }
+        }
+        // console.log(craft.forceSum,craft.torquSum)
+        craft.accelera = craft.forceSum.clone().divideScalar(craft.mass)
+        craft.rotaAcce = craft.torquSum/craft.inertia
+        craft.velocity = craft.velocity.add(craft.accelera.clone().multiplyScalar(dt))
+        craft.rotaVelo+= craft.rotaAcce*dt
+        craft.displace = craft.velocity.clone().multiplyScalar(dt)
+        craft.rotation(craft.rotation()+craft.rotaVelo*dt)
+        craft.displace.rotateDeg(craft.rotation())
+        craft.x(craft.x()+craft.displace.x)
+        craft.y(craft.y()+craft.displace.y)
+        field.offsetX(craft.x())
+        field.offsetY(craft.y())
+        // console.log(craft.accelera,craft.rotaAcce,craft.velocity,craft.rotaVelo,craft.displace,craft.rotation())
+        // console.log(craft.displace)
+        // space.batchDraw()
+      }
+      flash()
+
+
+
+      // setInterval('craft.y(craft.y()+1);field.offsetY(craft.y());space.batchDraw()',10)
+      // setInterval('craft.rotation(craft.rotation()-1);space.batchDraw()',10)
+      // setInterval("flash()",10)
+      // setInterval("space.batchDraw()",10)
+
+
+    </script>
+  </body>
+</html>

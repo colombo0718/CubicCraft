@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="konva.js"></script>
+    <script src="victor.js"></script>
+    <script src="CraftData.js"></script>
+    <meta charset="utf-8" />
+    <title>COC2D</title>
+    <style>
+      
+      body{
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #000000;
+      }
+      
+      #log{
+        position: absolute;
+        width:40%;
+        height:20%;
+        top: 78%;
+        left: 5px;
+        padding: .2em;
+        outline: 0;
+        font-family: monospace;
+        font-size: 1em;
+        color:#0ff;
+        background-color: #011;
+        border: 1px solid #0ff;
+        overflow-y: hidden;
+        /*vertical-align: bottom;*/
+      }
+
+      #log-text{
+        vertical-align: bottom;
+      }
+
+      #log-text{
+        margin-top:5px;
+        
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container" oncontextmenu="return false;"></div>
+
+    <div id="log">[ System Log ]
+      <div id=log-cont>
+        <p id="log-text"></p>
+      </div>  
+    </div>
+
+    <script> 
+
+      var buildCraft=function(model){
+
+        var craft = new Konva.Group();
+        craft.radius=0
+        craft.mass=model.unite.length      
+        craft.massCent=new Victor()
+
+        craft.forceSum=new Victor()  
+        craft.accelera=new Victor()
+        craft.velocity=new Victor()
+        craft.displace=new Victor()
+        craft.position=new Victor()
+
+        craft.inertia=0
+        craft.torquSum=0
+        craft.rotaAcce=0
+        craft.rotaVelo=0
+
+        // craft.left=new Victor(1,0)
+        // craft.head=new Victor(0,1)
+        craft.fac=0
+
+        for(var i=0;i<model.unite.length;i++){
+          var rect = new Konva.Rect({
+            x: model.unite[i].x,
+            y: model.unite[i].y,
+            offsetX: 0.5,
+            offsetY: 0.5,
+            width: 1,
+            height: 1,
+            fill: model.unite[i].color,
+            stroke: '#000000',
+            strokeWidth: .05
+          });
+          craft.add(rect);
+        }
+        // calculate COM and Inertia --------------------
+        for(var i=0;i<model.unite.length;i++){
+          var p=new Victor(model.unite[i].x,model.unite[i].y);
+          craft.radius+=p.length()
+         
+          // craft.massCent.x += model.unite[i].x
+          // craft.massCent.y += model.unite[i].y
+          craft.massCent.add( model.unite[i])
+        }  
+        craft.radius/=craft.mass
+        r=craft.radius
+        craft.massCent.divideScalar(craft.mass)
+        // console.log(craft.radius+"\n"+craft.massCent.toString())
+        craft.offsetX(craft.massCent.x)
+        craft.offsetY(craft.massCent.y)
+
+        var cyanCircle = new Konva.Circle({
+          x:craft.massCent.x,
+          y:craft.massCent.y,
+          radius: r*2,
+          stroke: '#0ff',
+          strokeWidth: .2,
+        });
+        craft.add(cyanCircle)
+
+        var cyanArrow = new Konva.Line({
+          x:craft.massCent.x,
+          y:craft.massCent.y,
+          points: [r,r*3, 0,r*6,-r,r*3, r,r*3],
+          stroke: '#0ff',
+          strokeWidth: .2
+        });
+        craft.add(cyanArrow)
+
+        var cyanBox = new Konva.Line({
+          x:craft.massCent.x,
+          y:craft.massCent.y,
+          points: [r*3,r*2, r*3,0, -r*3,0, -r*3,r*2],
+          stroke: '#0ff',
+          strokeWidth: .2
+        });
+        craft.add(cyanBox)
+
+        for(var i=0;i<model.unite.length;i++){
+          var p=new Victor(model.unite[i].x,model.unite[i].y);
+          craft.inertia+=p.distanceSq(craft.massCent)
+        }
+        console.log(craft.mass+"\n"+craft.radius+"\n"+craft.massCent.toString()+"\n"+craft.inertia)
+        // ------------------------------------------------
+        for(var i=0;i<model.engines.length;i++){
+          var len = model.engines[i].len
+          var fire = new Konva.Line({
+            id:"fire",
+            name:model.engines[i].name,
+            x: model.engines[i].x,
+            y: model.engines[i].y,
+            points: [0, 0, len/2, .4, 1.5*len,0,len/2,-.4],
+            fill: '#f00',
+            stroke: 'black',
+            strokeWidth: 0,
+            rotation:90*model.engines[i].dir,
+            closed: true,
+            visible:false
+          });
+          fire.force=new Victor(-200*model.engines[i].len,0)
+          fire.force.rotate(0.5*Math.PI*model.engines[i].dir)
+          var p = new Victor(model.engines[i].x,model.engines[i].y)
+          fire.torqu=p.cross(fire.force)
+
+          craft.add(fire);
+        }
+        // to switch a engine on or off 
+        craft.jet=function(name,onoff){
+          // console.log(craft.find("."+name).length)
+          if(craft.find("."+name).length>=1){
+            craft.find("."+name)[0].visible(onoff)
+          }
+          
+        }
+        // calculate one step move of craft in dt 
+        craft.run=function(dt){
+          craft.forceSum=new Victor()
+          craft.torquSum=0
+          // console.log(craft.find("#fire").length)
+          for(var i=0;i<craft.find("#fire").length;i++){
+            if(craft.find("#fire")[i].visible()){
+              craft.forceSum.add(craft.find("#fire")[i].force)
+              craft.torquSum+=craft.find("#fire")[i].torqu
+              // console.log(craft.torquSum)
+            }
+          }
+          // console.log(craft.forceSum,craft.torquSum)
+          craft.accelera = craft.forceSum.clone().divideScalar(craft.mass)
+          craft.rotaAcce = craft.torquSum/craft.inertia
+          craft.accelera.rotateDeg(craft.rotation())
+          craft.velocity = craft.velocity.add(craft.accelera.clone().multiplyScalar(dt))
+          craft.rotaVelo+= craft.rotaAcce*dt
+          craft.displace = craft.velocity.clone().multiplyScalar(dt)
+          // craft.x(craft.x()+craft.displace.x)
+          // craft.y(craft.y()+craft.displace.y)
+          craft.position = craft.position.add(craft.displace)
+          craft.x(craft.position.x)
+          craft.y(craft.position.y)
+          craft.rotation(craft.rotation()+craft.rotaVelo*dt)
+          
+
+          craft.fac=craft.rotation()+90
+          craft.vag=craft.displace.angleDeg()
+          craft.spd=craft.velocity.length()
+        }  
+
+        return craft;
+      }
+
+      var buildPlane=function(x1,y1,x2,y2){
+
+        var plane = new Konva.Group();
+        x1*=100;y1*=100;x2*=100;y2*=100;
+        // plot x line 
+        for(j=y1;j<=y2;j+=10){
+          if(j%100==0){color="#0a0"}
+          else{color="#050"}  
+
+          var line = new Konva.Line({
+            points: [x1,j,x2,j],
+            stroke: color,
+            strokeWidth: .2,
+
+          });
+          plane.add(line)
+        }
+        // plot y line
+        for(i=x1;i<=x2;i+=10){
+          if(i%100==0){color="#0a0"}
+          else{color="#050"} 
+
+          var line = new Konva.Line({
+            points: [i,y1,i,y2],
+            stroke: color,
+            strokeWidth: .2,
+
+          });
+          plane.add(line)
+        } 
+
+        return plane;
+      }
+
+      var route_sample={
+        type:"route",
+        spot:[
+          {ord:0,x: 0,y:  0,fac: 90,vag: 0,stl:0},//p 
+          {ord:1,x: 0,y: 50,fac: 90,vag: 0,stl:0},//pf
+          {ord:2,x: 0,y:100,fac: 90,vag:60,stl:0},//p v
+          {ord:2,x: 0,y:150,fac: 90,vag: 0,stl:1},//p s
+          {ord:3,x: 0,y:200,fac: 90,vag:30,stl:0},//pfv
+          {ord:3,x: 0,y:250,fac:-90,vag: 0,stl:1},//pfs
+        ]
+      }
+
+      var route_1={
+        type:"route",
+        spot:[
+          {ord:0,x: 0,y:  0,fac: 90,vag: 0,stl:10},//p 
+          {ord:0,x: 0,y: 50,fac:180,vag: 0,stl:10},//pf
+          {ord:0,x: 0,y:100,fac: 90,vag:60,stl:10},//p v
+          {ord:0,x: 0,y:150,fac: 90,vag: 0,stl: 0},//p s
+          {ord:0,x: 0,y:200,fac: 90,vag:30,stl:10},//pfv
+          {ord:0,x: 0,y:250,fac:-90,vag: 0,stl: 0},//pfs
+        ]
+      }
+
+      var route_2={
+        type:"route",
+        spot:[
+          {ord:0,x:  0,y:  0,fac: 90,vag: 0,stl:10},//p 
+          {ord:0,x:  0,y: 50,fac:180,vag: 0,stl:10},//pf
+          {ord:0,x: 50,y:100,fac: 90,vag:60,stl:10},//p v
+          {ord:0,x:-50,y:150,fac: 90,vag: 0,stl: 0},//p s
+          {ord:0,x: 50,y:200,fac: 90,vag:30,stl:10},//pfv
+          {ord:0,x:-50,y:250,fac:-90,vag: 0,stl: 0},//pfs
+          {ord:0,x:  0,y:300,fac:-90,vag: 0,stl: 0}
+        ]
+      }
+
+
+      var buildRunway=function(route){
+        var runway=new Konva.Group()
+        runway.checkpoint=[]
+
+        for(var i=0;i<route.spot.length;i++){
+
+          runway.checkpoint[i]=new Konva.Group({
+            x:route.spot[i].x,
+            y:route.spot[i].y,
+          })
+
+          runway.checkpoint[i].ord=route.spot[i].ord
+          var yellowCircle = new Konva.Circle({
+            radius: 3,
+            stroke: '#ff0',
+            strokeWidth: .5,
+          });
+
+          runway.checkpoint[i].fac=route.spot[i].fac
+          var redArrow = new Konva.Line({
+            points: [4,2, 10,0, 4,-2, 4,2],
+            stroke: '#ff0',
+            strokeWidth: .5,
+            rotation:route.spot[i].fac
+          });
+
+          runway.checkpoint[i].vag=route.spot[i].vag
+          var blueArc = new Konva.Arc({
+            innerRadius: 4,
+            outerRadius: 8,
+            angle: 30,
+            stroke: '#ff0',
+            strokeWidth: .5,
+            rotation:route.spot[i].vag-15
+          });
+
+          runway.checkpoint[i].stl=route.spot[i].stl
+          var whiteHexagon = new Konva.RegularPolygon({
+            sides: 6,
+            radius:6 ,
+            stroke: '#ff0',
+            strokeWidth: .5
+          });
+
+          if(route.spot[i].ord==1){
+            runway.checkpoint[i].add(redArrow)
+          }else if(route.spot[i].ord==2){
+            if(route.spot[i].stl==1){
+              runway.checkpoint[i].add(whiteHexagon)
+            }else{
+              runway.checkpoint[i].add(blueArc)
+            }
+          }else if(route.spot[i].ord==3){
+            runway.checkpoint[i].add(redArrow)           
+            if(route.spot[i].stl==1){
+              runway.checkpoint[i].add(whiteHexagon)
+            }else{
+              runway.checkpoint[i].add(blueArc)
+            }  
+          }
+          runway.checkpoint[i].add(yellowCircle)
+          runway.add(runway.checkpoint[i])          
+        }
+
+        runway.check=function(i,craft,err){
+          // console.log(runway.checkpoint[i].ord,craft.fac,craft.vag) 
+          err==err||1
+          var p1=new Victor(craft.x(),craft.y())
+          var p2=new Victor(runway.checkpoint[i].x(),runway.checkpoint[i].y())
+          var posGap=p1.distance(p2)
+          var facGap=runway.checkpoint[i].fac-craft.fac
+          var vagGap=runway.checkpoint[i].vag-craft.vag
+          // console.log(posGap,facGap,vagGap)
+          if(posGap>3*err){return false}
+
+          switch(runway.checkpoint[i].ord){
+          case 1:
+            if(facGap>10*err){return false}
+            break;
+
+          case 2:
+            if(route.spot[i].stl==1){
+              if(craft.spd>err){return false}
+            }else{
+              if(vagGap>10*err){return false}
+            }
+            break;
+
+          case 3:
+            if(facGap>10*err){return false}
+            if(route.spot[i].stl==1){
+              if(craft.spd>err){return false}
+            }else{
+              if(vagGap>10*err){return false}
+            }
+            break;
+          }
+
+          return true 
+        }
+
+        // runway.guideLine=new Konva.Group({name:"guideline"})
+        
+        runway.plotGuideLine=function(craft,p){
+          runway.find('.guideline').destroy()
+          runway.guideLine=new Konva.Group({name:"guideline"})
+          var line=new Konva.Line({
+            points:[craft.x(),craft.y(),runway.checkpoint[p].x(),runway.checkpoint[p].y()],
+            stroke: '#ff0',
+            strokeWidth: .2,
+          })
+          runway.guideLine.add(line)
+
+          for(var i=p;i<runway.checkpoint.length-1;i++){
+            var line=new Konva.Line({
+              points:[runway.checkpoint[i].x(),runway.checkpoint[i].y(),
+                      runway.checkpoint[i+1].x(),runway.checkpoint[i+1].y()],
+              stroke: '#ff0',
+              strokeWidth: .2,
+            })
+            runway.guideLine.add(line)
+          }
+          runway.add(runway.guideLine)
+        }
+
+        runway.orbitLine=new Konva.Group()
+        runway.add(runway.orbitLine)
+        runway.i=0
+        runway.plotOrbitLine=function(craft){
+          runway.i+=1
+          if(runway.i==10){runway.i=0}
+          if(runway.i!=0){return 0}
+          // console.log('dot')
+          var dot=new Konva.Circle({
+            x:craft.x(),
+            y:craft.y(),
+            radius: .2,
+            stroke: '#0ff',
+            strokeWidth: .1,
+          })
+          runway.orbitLine.add(dot)
+
+          // runway.prevX=craft.x()
+          // runway.prevY=craft.y()
+        }
+
+        return runway
+      }
+
+
+      var UI={}
+
+      UI.work=function(){
+
+        UI.mouseReact=function(eve){
+          // console.log(eve.pageX,eve.pageY,eve.buttons,eve)
+          if(eve.buttons==1){
+            space.offsetX(space.offsetX()-eve.movementX/space.scale().x)
+            space.offsetY(space.offsetY()+eve.movementY/space.scale().x)
+          }
+          // if(eve.buttons==2){
+          //   field.rotation(field.rotation()-eve.movementX/10)
+          // }  
+        }
+        UI.wheelReact=function(eve){
+          if(eve.wheelDelta>0&& space.scale().x<5){
+            space.scale({x:space.scale().x+.5 , y:space.scale().y-.5})
+          }else if(eve.wheelDelta<0 && space.scale().x>1.5){
+            space.scale({x:space.scale().x-.5 , y:space.scale().y+.5})
+          }
+          console.log(space.scale().x,space.scale().y)
+        }
+       
+        
+        UI.keyReact=function(eve){
+          // if(UI.keyState['q']==null){}
+          // console.log(eve.type,eve.key)
+          if(eve.type=='keydown'){UI.keyState[eve.key]=true;}
+          if(eve.type=='keyup'){UI.keyState[eve.key]=false;}
+        }
+        UI.keyState={
+          // 'a':false,'b':false,'c':false,
+        }
+        UI.isPress=function(key){
+          return UI.keyState[key]
+        }
+
+        document.addEventListener('mousemove',UI.mouseReact)
+        document.addEventListener("wheel",UI.wheelReact); 
+        document.addEventListener('keydown',UI.keyReact)
+        document.addEventListener('keyup',UI.keyReact)
+
+        UI.print=function(cont){
+          document.getElementById("log-text").innerHTML=cont
+        }
+ 
+      }
+
+
+
+      game={}
+      game.time=0
+      game.progress=0
+
+      game.init=function(){
+
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+
+        space = new Konva.Stage({
+          container: 'container',
+          x: width/2,
+          y: height/2,
+          width: width,
+          height: height,
+          scale:{x:3,y:-3}
+        });
+
+        field = new Konva.Layer({scale:{x:1,y: 1}});
+        space.add(field);
+
+        craft=buildCraft(kernal)
+        // craft=buildCraft(double)
+        // craft=buildCraft(fighter)
+
+        plane=buildPlane(-2,-1,2,3)
+
+        // runway=buildRunway(route_sample)
+        // runway=buildRunway(route_1)
+        runway=buildRunway(route_2)
+
+        UI.work()
+      }
+
+      game.setup=function(){
+        game.time=0.000
+        game.progress=0
+        field.add(plane)
+        field.add(runway)
+        field.add(craft)
+      }
+
+
+      game.flash=function(){
+        var dt=0.0100
+            // dv=new Victor(),dx=new Victor(),
+        game.time+=dt
+        pg=game.progress
+
+        // craft.velocity=new Victor(0,1)
+        // craft.rotaVelo=10
+        craft.run(dt)
+
+        field.offsetX(craft.x())
+        field.offsetY(craft.y())
+
+        // console.log(runway.check(1,craft,1) )
+
+
+        // user control region
+        
+        craft.jet('up',false)
+        craft.jet('down',false)
+        craft.jet('left',false)
+        craft.jet('right',false)
+        if(UI.isPress('w')){craft.jet('up',true)}
+        if(UI.isPress('s')){craft.jet('down',true)}
+        if(UI.isPress('a')){craft.jet('left',true)}
+        if(UI.isPress('d')){craft.jet('right',true)}
+
+        // craft.jet('fRight',false)
+        // craft.jet('fLeft',false)
+        // craft.jet('bRight',false)
+        // craft.jet('bLeft',false)
+
+        // if(UI.isPress('w')){
+        //   craft.jet('fRight',true)
+        //   craft.jet('fLeft',true)
+        // }
+        // if(UI.isPress('s')){
+        //   craft.jet('bRight',true)
+        //   craft.jet('bLeft',true)
+        // }
+        // if(UI.isPress('a')){
+        //   craft.jet('bLeft',true)
+        //   craft.jet('fRight',true)
+        // }       
+        // if(UI.isPress('d')){
+        //   craft.jet('fLeft',true)
+        //   craft.jet('bRight',true)
+        // }
+
+        // craft.jet('Major',false)
+        // craft.jet('Left',false)
+        // craft.jet('Right',false)
+        // craft.jet('br',false)
+        // craft.jet('bl',false)
+        // craft.jet('mr',false)
+        // craft.jet('ml',false)
+        // craft.jet('or',false)
+        // craft.jet('ol',false)
+
+        // if(UI.isPress('w')){
+        //   craft.jet('Major',true)
+        //   craft.jet('Left',true)
+        //   craft.jet('Right',true)
+        //   craft.jet('mr',true)
+        //   craft.jet('ml',true)
+        // }
+
+        // if(UI.isPress('s')){
+        //   craft.jet('br',true)
+        //   craft.jet('bl',true)
+        //   craft.jet('or',true)
+        //   craft.jet('ol',true)
+        // }
+
+        // if(UI.isPress('a')){
+        //   craft.jet('mr',true)
+        //   craft.jet('bl',true)
+        //   craft.jet('Right',true)
+        //   craft.jet('ol',true)
+        // }
+
+        // if(UI.isPress('d')){
+        //   craft.jet('ml',true)
+        //   craft.jet('br',true)
+        //   craft.jet('Left',true)
+        //   craft.jet('or',true)
+        // }
+
+        if(pg<runway.checkpoint.length){
+          runway.plotGuideLine(craft,pg)
+          // runway.plotOrbitLine(craft)
+          if(runway.check(pg,craft,1)){
+            runway.checkpoint[pg].visible(false)
+            game.progress+=1
+          }
+          UI.print("time = "+game.time+"<br>"+craft.position+"<br>"+craft.velocity)
+          }
+
+        space.batchDraw()         
+      }
+
+      game.init()
+      game.setup()
+      setInterval("game.flash()",10)
+    </script>
+  </body>
+</html>
