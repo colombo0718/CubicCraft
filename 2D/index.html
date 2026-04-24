@@ -515,20 +515,34 @@
         )
       }
 
-      // human-play loop: keyboard → engines → physics step
       game.flash = function(){
-        craft.jet('up',    UI.isPress('w'))
-        craft.jet('down',  UI.isPress('s'))
-        craft.jet('left',  UI.isPress('a'))
-        craft.jet('right', UI.isPress('d'))
-        game.physicsStep(0.0100)
+        if(game.rr.active){
+          if(game.rr.paused || game.rr.done) return
+          var a = game.rr.currentJets
+          craft.jet('up', a.up); craft.jet('down', a.down)
+          craft.jet('left', a.left); craft.jet('right', a.right)
+          game.rr.rewardAccum += game.physicsStep(0.0100) - 0.01
+          game.rr.stepCount++
+          var finished = game.progress >= runway.checkpoint.length
+          var timedout = game.rr.stepCount >= game.rr.maxSteps
+          if(finished || timedout){
+            game.rr.rewardAccum += finished ? 10 : 0
+            game.rr.done = true
+          }
+        } else {
+          craft.jet('up',    UI.isPress('w'))
+          craft.jet('down',  UI.isPress('s'))
+          craft.jet('left',  UI.isPress('a'))
+          craft.jet('right', UI.isPress('d'))
+          game.physicsStep(0.0100)
+        }
       }
 
       game.init()
       game.setup()
 
       // ===== RR Platform Bridge =====
-      game.rr = { active:false, paused:false, sessionId:0, stepsPerAction:5, stepCount:0, maxSteps:5000 }
+      game.rr = { active:false, paused:false, sessionId:0, stepsPerAction:5, stepCount:0, maxSteps:5000, rewardAccum:0, done:false, currentJets:{up:false,down:false,left:false,right:false} }
 
       game.rr.reset = function(){
         craft.position = new Victor(0,0)
@@ -538,6 +552,8 @@
         craft.fac = 90; craft.vag = 0; craft.spd = 0
         for(var i=0;i<runway.checkpoint.length;i++) runway.checkpoint[i].visible(true)
         game.progress = 0; game.time = 0; game.rr.stepCount = 0
+        game.rr.rewardAccum = 0; game.rr.done = false
+        game.rr.currentJets = {up:false,down:false,left:false,right:false}
         runway._guideCp = -1
         craft.jet('up',false); craft.jet('down',false)
         craft.jet('left',false); craft.jet('right',false)
@@ -604,11 +620,19 @@
           }, '*')
         }
         if(msg.type === 'action' && !game.rr.paused){
-          var r = game.rr.step(msg.action)
+          // 回報上一個 action 期間累積的 reward + 當下 state（物理已持續在跑）
+          var isDone = game.rr.done
           window.parent.postMessage({
-            type:'reward_state', reward:r.reward, state:r.state,
-            done:r.done, sessionId:game.rr.sessionId
+            type:'reward_state',
+            reward: game.rr.rewardAccum,
+            state: game.rr.getState(),
+            done: isDone,
+            sessionId: game.rr.sessionId
           }, '*')
+          game.rr.rewardAccum = 0
+          if(isDone){ game.rr.reset() }
+          // 套用新 action（物理下一幀自動生效）
+          game.rr.currentJets = RR_ACTIONS[msg.action] || RR_ACTIONS[0]
         }
         if(msg.type === 'pause') game.rr.paused = !game.rr.paused
         if(msg.type === 'accel') game.rr.stepsPerAction = game.rr.stepsPerAction===5 ? 50 : 5
@@ -618,7 +642,7 @@
       ;(function(){
         var fixedDt = 0.0100, accumulator = 0, lastTs = null, maxStep = 0.05
         function loop(ts){
-          if(lastTs !== null && !game.rr.active){
+          if(lastTs !== null){
             var elapsed = (ts - lastTs) / 1000
             accumulator += Math.min(elapsed, maxStep)
             while(accumulator >= fixedDt){ game.flash(); accumulator -= fixedDt }
