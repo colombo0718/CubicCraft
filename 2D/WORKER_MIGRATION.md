@@ -109,22 +109,29 @@ rAF 每幀
 
 物理和渲染在同一個 call stack 裡，完全同步。
 
-### 新架構（非同步）
+### 新架構（rAF 驅動，已落地）
 
 ```
-Worker（獨立執行緒）         Main Thread
-setInterval 100 Hz         rAF 60 Hz
-  └── doStep()               └── game.flash()   ← 只更新視覺噴焰
-        ├── 套用引擎               game.renderFrame() ← camera + HUD
-        └── postMessage(state)    space.batchDraw()
-
-physicsWorker.onmessage
-  ├── 更新 craft.x/y/rotation 等
-  ├── 檢查 checkpoint
-  └── 累計 reward
+Worker（獨立執行緒）         Main Thread（rAF 60 Hz）
+                              └── game.flash()       ← setEngines + 噴焰視覺
+                                  game.renderFrame() ← camera + HUD
+                                  field.draw()       ← 同步立即繪製（非 batchDraw）
+                                  postMessage({type:'step'})
+                                        │
+                              Worker 收到 step
+                                  └── doStep()
+                                        └── postMessage(state)
+                                                │
+                              onmessage（下一幀前到達）
+                                  ├── craft.x/y/rotation 等
+                                  ├── 檢查 checkpoint
+                                  └── 累計 reward
 ```
 
-**關鍵洞察**：RR 的 Plotly 凍結主執行緒時，Worker 的 `setInterval` 繼續跑，state messages 在 queue 裡堆積。主執行緒解凍後，一口氣處理所有積壓的 state messages，物理「補跑」。對 checkpoint 偵測沒有影響（每個 state 都會檢查）。
+**關鍵設計決策：**
+- `setInterval` 已移除，改由 rAF loop 結尾送 `{type:'step'}` 驅動，每幀精確一步（`FIXED_DT=1/60`）
+- `space.batchDraw()` 改為 `field.draw()`（同步立即繪製），避免 camera 與 craft 位置因 batchDraw 非同步造成的脫幀閃動（詳見 `BUG_REPORT_2026-04-25.md`）
+- Worker 回傳時機：rAF 結尾送 step → Worker 約 1ms 內完成並回傳 → onmessage 在下一幀 rAF 前更新位置 → 下一幀用最新狀態渲染，1 幀延遲但完全穩定
 
 ---
 
