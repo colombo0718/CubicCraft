@@ -566,7 +566,7 @@
         function loop(){
           game.flash()
           game.renderFrame()
-          space.batchDraw()
+          field.draw()
           physicsWorker.postMessage({type:'step'})
           requestAnimationFrame(loop)
         }
