@@ -529,7 +529,6 @@
 
       physicsWorker.onmessage = function(event){
         var msg = event.data
-        if(msg.type === 'debug'){ console.log('[worker]', msg.msg); return }
         if(msg.type !== 'state') return
 
         // Update craft visual state from Worker physics output
