@@ -522,28 +522,12 @@
         if(msg.type === 'accel') game.rr.stepsPerAction = game.rr.stepsPerAction===5 ? 50 : 5
       })
 
-      // ── Web Worker: 先試 Rapier，失敗自動 fallback 手搓版 ──────────────
-      function startWorker(url, opts) {
-        var w = opts ? new Worker(url, opts) : new Worker(url)
-        w.onmessage = handleWorkerMsg
-        w.onerror = function(e) {
-          console.warn('Rapier worker failed, falling back to hand-rolled:', e.message)
-          physicsWorker = startWorker('./physics.worker.js')
-        }
-        w.postMessage({ type:'init', craftData:kernal })
-        return w
-      }
+      // ── Web Worker: hand-rolled physics ──────────────────────────────
+      var physicsWorker = new Worker('./physics.worker.js')
+      physicsWorker.postMessage({type:'init', craftData:kernal})
 
-      var physicsWorker = startWorker('./physics.rapier.worker.js', {type:'module'})
-
-      function handleWorkerMsg(event){
+      physicsWorker.onmessage = function(event){
         var msg = event.data
-        if(msg.type === 'ready'){ console.log('Physics engine:', msg.engine); return }
-        if(msg.type === 'error'){
-          console.warn('Physics worker error:', msg.msg)
-          physicsWorker = startWorker('./physics.worker.js')
-          return
-        }
         if(msg.type !== 'state') return
 
         // Update craft visual state from Worker physics output
@@ -575,8 +559,6 @@
           if(game.rr.stepCount >= game.rr.maxSteps) game.rr.done = true
         }
       }
-
-      physicsWorker.postMessage({type:'init', craftData:kernal})
 
       // main rAF loop: jet visuals + render only (physics is in Worker)
       ;(function(){
