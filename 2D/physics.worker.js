@@ -46,10 +46,15 @@ function doStep() {
 }
 
 setInterval(doStep, FIXED_DT * 1000);
+postMessage({type:'debug', msg:'worker loaded'});
 
 self.onmessage = function(event) {
   var msg = event.data;
-  if (msg.type==='init') { initBody(msg.craftData); }
+  if (msg.type==='init') {
+    postMessage({type:'debug', msg:'init received'});
+    initBody(msg.craftData);
+    postMessage({type:'debug', msg:'initBody done, body='+!!body});
+  }
   else if (msg.type==='setEngines') { active = msg.engines; }
   else if (msg.type==='reset') {
     generation++;

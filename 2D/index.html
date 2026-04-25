@@ -524,10 +524,12 @@
 
       // ── Web Worker: hand-rolled physics ──────────────────────────────
       var physicsWorker = new Worker('./physics.worker.js')
+      physicsWorker.onerror = function(e){ console.error('worker onerror:', e.message, e.filename, e.lineno) }
       physicsWorker.postMessage({type:'init', craftData:kernal})
 
       physicsWorker.onmessage = function(event){
         var msg = event.data
+        if(msg.type === 'debug'){ console.log('[worker]', msg.msg); return }
         if(msg.type !== 'state') return
 
         // Update craft visual state from Worker physics output
