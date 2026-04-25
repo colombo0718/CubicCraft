@@ -11,9 +11,10 @@
 
 ## 線上網址
 
-- 計畫部署：`cubiccraft.leaflune.org`（Cloudflare Pages，尚未部署）
-- 2D 版預計網址：`cubiccraft.leaflune.org/2D/index.html`
-- GitHub：（待補）
+- 主站：`cubiccraft.leaflune.org`（Cloudflare Pages，已部署）
+- 2D 版：`cubiccraft.leaflune.org/2D/`
+- RR 整合入口：`reinforcelab.vercel.app/?game=https://cubiccraft.leaflune.org/2D`
+- GitHub：`https://github.com/colombo0718/CubicCraft`
 
 ---
 
@@ -27,9 +28,11 @@ ccGenerator.js      自定義 Blockly → JS 產生器
 craftData.js        3D 機體資料
 routeData.js        3D 賽道資料
 2D/
-  index.html        COC2D 主版（Konva.js 物理模擬 + Checkpoint 系統）
+  index.html        COC2D 主版（Konva.js 渲染 + Worker 物理 + RR 協定）
+  physics.worker.js 物理 Worker（手搓剛體，100% 離線，無外部依賴）
   CraftData.js      2D 機體資料（kernal / double / fighter）
   codecraft.html    （舊版，備存）
+tools/              Playwright 自動化腳本（record_cc2d / record_rr / check_flicker）
 media/              音效、圖片、游標資源
 jquery-ui/          jQuery UI 主題（TechGreen）
 manuscript/         2016 年原始設計手稿（11 張 JPG + 對應 MD）
@@ -39,13 +42,19 @@ manuscript/         2016 年原始設計手稿（11 張 JPG + 對應 MD）
 
 ## 2D 版物理架構
 
-### 機體建構（`buildCraft`）
-- 質量 = block 數量
-- 質心 = Σ(block 位置) / mass
-- 轉動慣量 I = Σ dist²(block, 質心)
-- 引擎扭矩 = r × F（叉積，位置向量 × 推力向量）
+### 執行緒架構
+物理跑在 **Web Worker**（`physics.worker.js`），與主執行緒完全隔離。
+- 主執行緒：Konva 渲染 + RR postMessage + 鍵盤輸入
+- Worker：剛體積分，由 rAF loop 每幀送 `{type:'step'}` 驅動（60Hz，`FIXED_DT=1/60`）
+- Worker → 主執行緒：每幀回傳 `{type:'state', x, y, vx, vy, rotation, ...}`
 
-### 每幀更新（`craft.run(dt)`）
+### 機體建構（`buildCraft`，視覺端）
+- 質量 = block 數量
+- 質心 = Σ(block 位置) / mass（Worker 內重算）
+- 轉動慣量 I = Σ dist²(block, 質心)（Worker 內）
+- 引擎扭矩 = r × F（叉積）（Worker 內）
+
+### Worker 每步積分
 ```
 F_sum → a = F/m → v += a·dt → pos += v·dt
 τ_sum → α = τ/I → ω += α·dt → θ += ω·dt
@@ -59,23 +68,34 @@ F_sum → a = F/m → v += a·dt → pos += v·dt
 
 ---
 
-## RR 平台整合規格（規劃中）
+## RR 平台整合規格（已實作）
 
-CC 2D 版目標成為 RR（Rein Room）強化學習平台的外部遊戲環境，使用 postMessage 雙向通訊。
+CC 2D 版已接入 RR（Rein Room）強化學習平台，使用 postMessage 雙向通訊。
 
-### 預計 state 向量
+### state 向量（9 維）
 ```
 [x, y, vx, vy, angle, ω, dx_to_cp, dy_to_cp, dist_to_cp]
 ```
 
-### 預計 action
-- 離散：0–15（4 顆引擎的開關組合）
-- 連續：每顆引擎的推力大小（0~1）
+### action（5 種離散）
+```
+0: 無  1: up  2: down  3: left  4: right
+```
+對應 `RR_ACTIONS` 映射表，送入 Worker 的 `setEngines`。
 
-### reward 設計
-- 通過 checkpoint：+100
-- 時間懲罰：-0.1/幀
-- 偏離過遠：負分或 done=true
+### reward 設計（已實作）
+- 通過 checkpoint：+1（全關卡通過額外 +10）
+- 時間懲罰：-0.01 / 每物理步
+- 超過 maxSteps（5000）：done=true
+
+### 通訊流程
+```
+RR → CC: questInfo（sessionId）
+CC → RR: gameInfo（stateInfo / actionInfo）
+RR → CC: action
+CC → RR: reward_state（reward, state, done, sessionId）
+RR → CC: pause / accel
+```
 
 參考 RR 協定：`RR平台可控遊戲環境宣告與通訊協定.md`
 

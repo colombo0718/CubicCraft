@@ -2,17 +2,16 @@
 
 ---
 
-## 🔥 當前優先：2D 版接入 RR 平台
+## ✅ 已完成：2D 版接入 RR 平台
 
-- [ ] 移除 WASD 手動控制，改由 RR `action` 訊息驅動引擎開關
-  > 保留手動模式作為 debug 用，透過 URL 參數或 flag 切換
-- [ ] 實作 `gameInfo` 宣告（stateInfo / actionInfo）
-  > state 維度：[x, y, vx, vy, angle, ω, dx_to_cp, dy_to_cp, dist_to_cp]
-  > action：4 顆引擎的離散開關組合（0–15）或連續推力
-- [ ] 實作 `reward_state` 回報（含 done 欄位）
-  > checkpoint 通過 +reward，超時 done=true，偏離過遠 done=true
-- [ ] 接收 `questInfo` 取得 sessionId，帶回 reward_state
-- [ ] 部署到 Cloudflare Pages（cubiccraft.leaflune.org）
+- [x] 物理移入 Web Worker（`physics.worker.js`），解決與 RR 同 renderer process 的 rAF 阻塞問題
+- [x] WASD 手動控制 + RR action 雙模式（`game.rr.active` flag 切換）
+- [x] 實作 `gameInfo` 宣告（stateInfo 9 維 / actionInfo 5 種離散）
+- [x] 實作 `reward_state` 回報（checkpoint +1、全通 +10、時間罰 -0.01/步、超步數 done）
+- [x] 接收 `questInfo` 取得 sessionId，帶回 reward_state
+- [x] 部署到 Cloudflare Pages（cubiccraft.leaflune.org）
+- [x] 修復 RR setEngines 未送 Worker（火焰有但機體不動）
+- [x] 修復 Konva batchDraw 非同步造成 camera 脫幀閃動（改 field.draw()）
 
 ---
 
