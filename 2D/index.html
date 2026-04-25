@@ -434,8 +434,8 @@
         } else {
           up=!!UI.isPress('w'); down=!!UI.isPress('s')
           left=!!UI.isPress('a'); right=!!UI.isPress('d')
-          physicsWorker.postMessage({type:'setEngines', engines:{up:up,down:down,left:left,right:right}})
         }
+        physicsWorker.postMessage({type:'setEngines', engines:{up:up,down:down,left:left,right:right}})
         craft.jet('up',up); craft.jet('down',down)
         craft.jet('left',left); craft.jet('right',right)
       }
@@ -567,6 +567,7 @@
           game.flash()
           game.renderFrame()
           space.batchDraw()
+          physicsWorker.postMessage({type:'step'})
           requestAnimationFrame(loop)
         }
         requestAnimationFrame(loop)

@@ -1,5 +1,5 @@
 // physics.worker.js — hand-rolled physics, no external deps
-var FIXED_DT = 0.010;
+var FIXED_DT = 1/60;
 var body = null, engineDefs = [], active = {up:false,down:false,left:false,right:false};
 var stepTime = 0, generation = 0;
 
@@ -45,13 +45,12 @@ function doStep() {
     time:stepTime, gen:generation });
 }
 
-setInterval(doStep, FIXED_DT * 1000);
-
 self.onmessage = function(event) {
   var msg = event.data;
   if (msg.type==='init') {
     initBody(msg.craftData);
   }
+  else if (msg.type==='step') { doStep(); }
   else if (msg.type==='setEngines') { active = msg.engines; }
   else if (msg.type==='reset') {
     generation++;
